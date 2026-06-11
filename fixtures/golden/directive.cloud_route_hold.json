@@ -1,0 +1,35 @@
+{
+  "schema_version": "cloud_security.control_directive.v1",
+  "control_id": "ctl_golden_001",
+  "incident_id": "inc_0443",
+  "policy_decision_id": "pdec_0001",
+  "issuer": "forge-command-policy",
+  "issued_at": "2026-06-09T17:10:00.000Z",
+  "expires_at": "2026-06-09T17:25:00.000Z",
+  "action": "cssa.cloud_route.hold",
+  "target": {
+    "tenant_id": "ten_demo",
+    "principal_id": "usr_owner",
+    "executor_id": "agt_01",
+    "cloud_service": "neuroforge",
+    "provider": "provider_a"
+  },
+  "scope": "single_executor_single_route",
+  "max_uses": 1,
+  "approval": {
+    "level": "single_operator",
+    "approval_id": "apr_op17_001"
+  },
+  "rollback": {
+    "required": true,
+    "action": "cssa.cloud_route.release"
+  },
+  "reason_codes": [
+    "SENTINEL_COMPOUND_COMPROMISE"
+  ],
+  "integrity": {
+    "algorithm": "hmac-sha256",
+    "key_id": "key_fc_policy_01",
+    "signature": "0000000000000000000000000000000000000000000000000000000000000000"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "event_id": "evt_golden_usage",
+  "event_type": "usage.tokens.recorded",
+  "schema_version": "1.0.0",
+  "occurred_at": "2026-06-09T12:00:00.000Z",
+  "observed_at": "2026-06-09T12:00:00.000Z",
+  "producer": {
+    "service": "usage-metering",
+    "instance_id": "usage-metering-01",
+    "version": "1.0.0",
+    "environment": "production"
+  },
+  "tenant": {
+    "tenant_id": "ten_demo",
+    "account_id": "acct_2041"
+  },
+  "actor": {
+    "actor_type": "service",
+    "actor_id": "neuroforge-gateway"
+  },
+  "subject": {
+    "subject_type": "account",
+    "subject_id": "acct_2041"
+  },
+  "correlation": {
+    "trace_id": "trc_evt_golden_usage"
+  },
+  "location": {
+    "execution_lane": "cloud"
+  },
+  "payload": {
+    "raw_prompt": "private manuscript text"
+  },
+  "data_policy": {
+    "content_included": true,
+    "sensitivity": "restricted",
+    "retention_class": "security_365d",
+    "cloud_allowed": true
+  },
+  "integrity": {
+    "payload_hash": "sha256:36df8ae6628f7bdc0df131c2271514f721b6eb6ee6ae5882e7d35b3b15e1614d",
+    "idempotency_key": "evt_golden_usage"
+  }
+}
