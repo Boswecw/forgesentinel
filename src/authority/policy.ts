@@ -71,6 +71,32 @@ export const AGENT_DRIFT_POLICY: PolicyDefinition = {
   cooldown_seconds: 600,
 };
 
+/** sentinel_data_exfiltration v1.0.0 — Wave 8 playbook PB-DATA-EXFIL-01 (03, 10). */
+export const DATA_EXFILTRATION_POLICY: PolicyDefinition = {
+  policy_id: "sentinel_data_exfiltration",
+  version: "1.0.0",
+  match: { incident_type: "compound.data_exfiltration", environment: "production" },
+  rules: [
+    {
+      // Lower likelihood gate than identity containment: the allowed actions
+      // are a reversible single-destination block behind operator approval
+      // and a redaction requirement — smallest scope, lowest blast radius.
+      when: {
+        likelihood_gte: 0.65,
+        confidence_gte: 0.65,
+        evidence_quality_gte: 0.8,
+        independent_signal_count_gte: 2,
+      },
+      allow: [
+        { action: "data.export_destination.block", scope: "single_destination", approval: "single_operator", reversible: true, expires_in_seconds: 900 },
+        { action: "data.redaction.require", scope: "account_exports", approval: "policy_allowed", reversible: true, expires_in_seconds: 900 },
+      ],
+    },
+  ],
+  always_deny: ["customer_data.delete", "license.permanent_revoke", "source_code.direct_patch"],
+  cooldown_seconds: 600,
+};
+
 export interface PolicyContext {
   environment: string;
   active_data_exfiltration?: boolean;

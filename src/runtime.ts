@@ -13,8 +13,10 @@ import { SentinelCostNode, TOKENS_PER_DAY, DAILY_USAGE_BASELINE } from "./intel/
 import { SentinelCloudNode } from "./intel/cloud.js";
 import { SentinelAgentNode } from "./intel/agent.js";
 import { SentinelProviderNode } from "./intel/provider.js";
-import { SentinelPrime, ACCOUNT_COMPROMISE_COMPOUND, AGENT_DRIFT_COMPOUND } from "./intel/prime.js";
-import { PolicyService, ACCOUNT_COMPROMISE_POLICY, AGENT_DRIFT_POLICY } from "./authority/policy.js";
+import { SentinelLicenseNode } from "./intel/license.js";
+import { SentinelDataNode } from "./intel/data.js";
+import { SentinelPrime, ACCOUNT_COMPROMISE_COMPOUND, AGENT_DRIFT_COMPOUND, DATA_EXFILTRATION_COMPOUND } from "./intel/prime.js";
+import { PolicyService, ACCOUNT_COMPROMISE_POLICY, AGENT_DRIFT_POLICY, DATA_EXFILTRATION_POLICY } from "./authority/policy.js";
 import { ReceiptService } from "./authority/receipts.js";
 
 const DAY_MS = 24 * 3600 * 1000;
@@ -55,6 +57,8 @@ export class SentinelRuntime {
   readonly cloudNode: SentinelCloudNode;
   readonly agentNode: SentinelAgentNode;
   readonly providerNode: SentinelProviderNode;
+  readonly licenseNode: SentinelLicenseNode;
+  readonly dataNode: SentinelDataNode;
   readonly prime: SentinelPrime;
   readonly policy = new PolicyService();
   readonly receipts: ReceiptService;
@@ -146,6 +150,15 @@ export class SentinelRuntime {
       aggregation: { operation: "count" },
       privacy: { stores_content: false, cloud_allowed: true, retention_class: "security_365d" },
     });
+    this.features.register({
+      feature_id: "data.export_bytes_24h",
+      version: "1.0.0",
+      source_events: ["data.object.exported"],
+      scope: ["tenant_id", "account_id"],
+      window: { type: "rolling", duration_ms: DAY_MS, lateness_allowance_ms: 15 * 60 * 1000 },
+      aggregation: { operation: "sum", field: "payload.bytes" },
+      privacy: { stores_content: false, cloud_allowed: true, retention_class: "security_365d" },
+    });
 
     this.baselines.register({
       baseline_id: DAILY_USAGE_BASELINE,
@@ -164,9 +177,12 @@ export class SentinelRuntime {
     this.cloudNode = new SentinelCloudNode(this.features);
     this.agentNode = new SentinelAgentNode(this.features);
     this.providerNode = new SentinelProviderNode();
-    this.prime = new SentinelPrime([ACCOUNT_COMPROMISE_COMPOUND, AGENT_DRIFT_COMPOUND]);
+    this.licenseNode = new SentinelLicenseNode();
+    this.dataNode = new SentinelDataNode(this.features);
+    this.prime = new SentinelPrime([ACCOUNT_COMPROMISE_COMPOUND, AGENT_DRIFT_COMPOUND, DATA_EXFILTRATION_COMPOUND]);
     this.policy.register(ACCOUNT_COMPROMISE_POLICY);
     this.policy.register(AGENT_DRIFT_POLICY);
+    this.policy.register(DATA_EXFILTRATION_POLICY);
   }
 
   /**
@@ -226,6 +242,14 @@ export class SentinelRuntime {
     const providerOutput = this.providerNode.process(events);
     findings.push(...providerOutput.findings);
     evidence.push(...providerOutput.evidence);
+
+    const licenseOutput = this.licenseNode.process(events);
+    findings.push(...licenseOutput.findings);
+    evidence.push(...licenseOutput.evidence);
+
+    const dataOutput = this.dataNode.process(events, learnCutoff);
+    findings.push(...dataOutput.findings);
+    evidence.push(...dataOutput.evidence);
 
     for (const record of evidence) {
       this.ledger.append({ kind: "evidence", gateway_version: "feature-service.1.0.0", validation: "accepted", transformation_version: "1.0.0", ...(record.scope["tenant_id"] !== undefined ? { tenant_id: record.scope["tenant_id"] } : {}), body: record });

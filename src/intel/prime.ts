@@ -35,6 +35,26 @@ export const ACCOUNT_COMPROMISE_COMPOUND: CorrelationRule = {
   },
 };
 
+export const DATA_EXFILTRATION_COMPOUND: CorrelationRule = {
+  correlation_id: "prime.data_exfiltration_compound",
+  version: "1.0.0",
+  subject_field: "account_id",
+  window_ms: 2 * 3600 * 1000,
+  supporting: [
+    { finding_type: "data.bulk_export", weight: 0.35 },
+    { finding_type: "data.new_destination", weight: 0.25 },
+    { finding_type: "data.redaction_failure", weight: 0.3 },
+    { finding_type: "data.cross_tenant_attempt", weight: 0.3 },
+  ],
+  independence: { minimum_groups: 2 },
+  emit: {
+    incident_type: "compound.data_exfiltration",
+    playbook: "PB-DATA-EXFIL-01",
+    title: "Possible data exfiltration: bulk movement with boundary pressure",
+    required_authority: ["dataforge", "forge_command_operator"],
+  },
+};
+
 export const AGENT_DRIFT_COMPOUND: CorrelationRule = {
   correlation_id: "prime.agent_drift_compound",
   version: "1.0.0",
@@ -201,7 +221,21 @@ export class SentinelPrime {
     const recommendedActions: RecommendedAction[] = [];
     let briefing: Incident["briefing"];
 
-    if (rule.emit.incident_type === "compound.agent_drift") {
+    if (rule.emit.incident_type === "compound.data_exfiltration") {
+      const destination = findings.map((finding) => finding.correlation_hints.destination).find((value) => value !== undefined);
+      if (destination) {
+        recommendedActions.push({ action_type: "data.export_destination.block", target_id: destination, scope: "single_destination", reversible: true, approval: "single_operator" });
+      }
+      recommendedActions.push({ action_type: "data.redaction.require", target_id: subjectId, scope: "account_exports", reversible: true, approval: "policy_allowed" });
+      briefing = {
+        issue: `Account ${subjectId} shows correlated data-movement signals: ${signals.join(", ")}.`,
+        where: `Data exports for account ${subjectId} (tenant ${tenantId}).`,
+        recommended_fix: destination
+          ? `Temporarily block only destination "${destination}", require redaction on this account's exports, and preserve evidence without copying raw content.`
+          : "Require redaction on this account's exports and preserve evidence without copying raw content.",
+        why_now: `Independent weak signals (${groups.size} independent evidence groups) now form a correlated exfiltration pattern.`,
+      };
+    } else if (rule.emit.incident_type === "compound.agent_drift") {
       const boundary = findings.find((finding) => finding.finding_type === "agent.boundary_violation");
       const runId = boundary?.correlation_hints.run_id;
       if (runId) {

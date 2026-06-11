@@ -16,10 +16,10 @@ repository; `partial` — meaningful subset implemented; `not started`.
 | 4 | Forge_Command incident surface | not started | Incident/briefing contracts and CLI shadow report exist as the data layer; UI lives in the Forge_Command repository. |
 | 5 | Sentinel-Agent | done (MVP) | Fingerprint-scoped features (release boundaries cannot mix baselines), boundary-violation/patch-burst/denial/loop findings, compound drift correlation, `sentinel_agent_drift@1.0.0` policy, YellowJacket stop + exact-version quarantine with receipted re-enable. All five Wave 5 exit-gate items tested. Sandbox replay and SMITH handoff projection pending. |
 | 6 | Sentinel-Provider + NeuroForge | partial | Fingerprint registry with alias-change findings; trust reset on material change (no silent inheritance, historical identity retained); sensitive-category eligibility gate. EMA integration, challenger shadow evaluation, and NeuroForge routing integration pending. |
-| 7 | Sentinel-License | not started | License/billing event families and signature-required ingestion enforced; detector pending. |
-| 8 | Sentinel-Data | partial (early) | Cross-tenant denial recording and cloud field policy enforced at the ledger now (the plan's reason to defer Sentinel-Data was the need for these foundations). Export/egress detectors pending. |
-| 9 | Sentinel Prime | partial | Deterministic compound correlation, independence accounting, feedback-loop exclusion, conflict preservation, duplicate merge, lifecycle. ML correlation deliberately deferred (ADR-018). |
-| 10 | Governed learning | not started | Feedback-label contract with training-eligibility/privacy gating exists; calibration pipeline pending. |
+| 7 | Sentinel-License | done (MVP) | Real Ed25519 entitlement verification failing closed (unknown key, bad signature, expiry); stale cached entitlements keep safe local operation but require revalidation for paid cloud; shared-entitlement/device-farm, trial-cycling, activation-churn, Stripe-divergence, and invalid-entitlement findings. All five Wave 7 exit-gate items tested. Revalidation executor lives with the entitlement service. |
+| 8 | Sentinel-Data | partial | Cross-tenant attempt, redaction failure, export-destination novelty, and bulk-export findings; compound exfiltration correlation with exact-destination block via `sentinel_data_exfiltration@1.0.0`; cloud field policy + recorded denials at the ledger. Retention-failure incidents and classification-transition detectors pending. |
+| 9 | Sentinel Prime | partial | Deterministic compound correlation (account compromise, agent drift, data exfiltration), independence accounting, feedback-loop exclusion, conflict preservation, duplicate merge, lifecycle. ML correlation deliberately deferred (ADR-018). |
+| 10 | Governed learning | partial | FeedbackStore with contract-validated reviewed labels, explicit training eligibility (privacy approval required), and per-family calibration reports that exclude control-effect-only labels from outcome rates (SNT-405). Dataset registry and champion/challenger pipeline pending. |
 | 11 | Production hardening | not started | |
 
 ## CSSA integration gates (2026-06-11 addendum)
@@ -43,14 +43,16 @@ repository; `partial` — meaningful subset implemented; `not started`.
 - SNT-115 CSSA Evidence Adapter — **partial**
 - SNT-120 Sentinel-Agent — **done (MVP)** (sandbox replay + SMITH handoff pending)
 - SNT-130 Sentinel-Provider — **partial** (fingerprint registry + trust reset; NeuroForge integration pending)
-- SNT-140/150 License + Data nodes — **not started**
+- SNT-140 Sentinel-License — **done (MVP)**
+- SNT-150 Sentinel-Data — **partial**
 - SNT-200 Sentinel Prime — **partial (deterministic MVP)**
 - SNT-205 CSSA Finding Normalization — **done (MVP)**
 - SNT-210 Policy Service — **done (MVP)**
 - SNT-215 Signed Cloud Control Directives — **done (MVP)**
 - SNT-220 Action/Receipt Service — **done (MVP)**
 - SNT-300/305/310 Forge_Command surfaces — **not started**
-- SNT-400/405 Feedback/Calibration — **contracts only**
+- SNT-400 Feedback/Calibration — **partial** (reviewed-label store, training eligibility, per-family calibration; dataset registry + challenger pipeline pending)
+- SNT-405 Feedback-Loop Calibration — **done (MVP)** (control lineage excluded from independence and tracked separately in calibration)
 
 ## Definition-of-done tracking (00_README)
 
@@ -60,7 +62,7 @@ repository; `partial` — meaningful subset implemented; `not started`.
 | Every action has authority owner, exact scope, rollback, receipt | tested (`capability.test.ts`, `cssa.test.ts`) |
 | Every rule/feature/policy versioned | yes (feature/baseline/policy/correlation versions) |
 | Local/cloud boundaries enforced and tested | tested (`ledger.test.ts`) |
-| Alias change cannot inherit trust | contract helper only; routing integration pending |
-| Calibration metrics per incident family | pending |
+| Alias change cannot inherit trust | tested (`provider.test.ts`): provisional successor with zeroed task trust |
+| Calibration metrics per incident family | partial (`feedback.test.ts`): precision + calibration gap per family with control-effect separation; recall/detection delay pending |
 | Compromised node cannot mutate code/billing/license | enforced via `GLOBAL_ALWAYS_DENY` + no authority credentials in nodes; tested |
 | Degraded modes preserve hard controls | partially demonstrated (WAL reload); chaos tests pending |

@@ -29,6 +29,9 @@ Implementation status by wave/epic: [`docs/sentinel/implementation-status.md`](d
 | Sentinel-Cloud (shadow): key/region/device novelty, login-failure bursts | `src/intel/cloud.ts` | Wave 3, SNT-110 |
 | Sentinel-Agent (shadow): fingerprint-scoped patch-burst/boundary/denial/loop findings | `src/intel/agent.ts` | Wave 5, SNT-120 |
 | Sentinel-Provider (shadow): fingerprint registry, alias-change findings, trust reset without inheritance | `src/intel/provider.ts` | Wave 6, SNT-130 |
+| Sentinel-License (shadow): Ed25519 entitlement verification (fail closed), shared-entitlement/trial-cycling/churn/Stripe-divergence findings | `src/intel/license.ts`, `src/authority/entitlement.ts` | Wave 7, SNT-140 |
+| Sentinel-Data (shadow): cross-tenant attempts, redaction failures, destination novelty, bulk export, compound exfiltration | `src/intel/data.ts` | Wave 8, SNT-150 |
+| Governed feedback: reviewed labels, explicit training eligibility, per-family calibration with control-effect separation | `src/learning/feedback.ts` | Wave 10, SNT-400/405 |
 | Sentinel Prime: deterministic compound correlation (account compromise + agent drift), evidence-independence accounting, feedback-loop exclusion, conflict preservation, duplicate merge, lifecycle | `src/intel/prime.ts` | SNT-200 (deterministic MVP) |
 | Policy service: versioned `sentinel_account_compromise@3.1.0` and `sentinel_agent_drift@1.0.0`, always-deny enforcement, cooldown, approval levels | `src/authority/policy.ts` | SNT-210 |
 | Capability tokens + executor validation + receipts + rollback (Identity and YellowJacket authorities) | `src/authority/capability.ts`, `executor.ts`, `yellowjacket.ts`, `receipts.ts` | SNT-220 |
@@ -44,7 +47,7 @@ adapter.
 
 ```bash
 npm install
-npm test                # build + 83 tests against plan exit gates
+npm test                # build + 99 tests against plan exit gates
 npm run fixtures        # regenerate deterministic fixtures
 
 # Replay the end-to-end scenario from the plan (new key + new region +
@@ -69,8 +72,11 @@ node dist/src/cli.js validate directive fixtures/golden/directive.cloud_route_ho
 src/
   contracts/   Wave 0 contract package (validation, versioning, families)
   spine/       Wave 1 evidence spine (producers, gateway, ledger, replay)
-  intel/       features, baselines, Sentinel-Cost, Sentinel-Cloud, Prime
-  authority/   policy decision point, capabilities, executors, receipts, CSSA controls
+  intel/       features, baselines, all six nodes (Cost, Cloud, Agent,
+               Provider, License, Data) and Sentinel Prime
+  authority/   policy decision point, capabilities, executors (Identity,
+               YellowJacket), receipts, CSSA controls, entitlement verifier
+  learning/    governed feedback and calibration (SNT-400/405)
   runtime.ts   modular-monolith wiring (shadow pipeline)
   cli.ts       validate / replay CLI
 fixtures/
@@ -101,3 +107,8 @@ docs/
   hypothesis.
 - **Novelty alone never escalates**; a usage spike alone caps confidence and
   yields `RECOMMEND_ONLY`.
+- **Invalid entitlement signatures fail closed** (Ed25519); stale cached
+  entitlements preserve safe local operation but never paid cloud privilege.
+- **No record trains anything automatically** — training eligibility and
+  privacy approval are explicit per reviewed label, and calibration excludes
+  control-effect-only labels from outcome rates.

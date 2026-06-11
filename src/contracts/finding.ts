@@ -62,6 +62,7 @@ export interface Finding {
     run_id?: string;
     provider?: string;
     model_fingerprint?: string;
+    destination?: string;
   };
   policy_generated_effect: boolean;
 }
