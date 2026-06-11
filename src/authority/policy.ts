@@ -10,6 +10,9 @@ export const GLOBAL_ALWAYS_DENY: Record<string, string> = {
   "license.permanent_revoke": "Sentinel cannot authorize irreversible commercial revocation.",
   "customer_data.delete": "Sentinel cannot authorize customer data deletion.",
   "source_code.direct_patch": "Code mutation routes through SMITH governance, never Sentinel (ADR-007).",
+  "agent.patch.apply": "Sentinel cannot apply or promote patches; repair routes through SMITH (ADR-007).",
+  "agent.patch.promote": "Sentinel cannot apply or promote patches; repair routes through SMITH (ADR-007).",
+  "smith.proposal.approve": "Mutation approval belongs to SMITH governance, not Sentinel.",
   "billing.subscription.cancel": "Billing truth belongs to the Stripe-verified billing service (ADR-013).",
   "account.terminate": "Permanent customer action requires the authorized business owner.",
 };
@@ -39,6 +42,32 @@ export const ACCOUNT_COMPROMISE_POLICY: PolicyDefinition = {
     },
   ],
   always_deny: ["license.permanent_revoke", "customer_data.delete", "source_code.direct_patch"],
+  cooldown_seconds: 600,
+};
+
+/** sentinel_agent_drift v1.0.0 — Wave 5 playbook PB-AGENT-DRIFT-01 (03, 12). */
+export const AGENT_DRIFT_POLICY: PolicyDefinition = {
+  policy_id: "sentinel_agent_drift",
+  version: "1.0.0",
+  match: { incident_type: "compound.agent_drift", environment: "production" },
+  rules: [
+    {
+      when: {
+        likelihood_gte: 0.7,
+        confidence_gte: 0.7,
+        evidence_quality_gte: 0.8,
+        independent_signal_count_gte: 2,
+        includes_signal: ["agent.boundary_violation"],
+      },
+      allow: [
+        // Stopping one run is a Class 2 guard: narrow, pre-approved.
+        { action: "yellowjacket.run.stop", scope: "single_run", approval: "policy_allowed", reversible: false, expires_in_seconds: 300 },
+        // Quarantining an exact version is Class 3: operator approved.
+        { action: "yellowjacket.agent_version.quarantine", scope: "single_agent_version", approval: "single_operator", reversible: true, expires_in_seconds: 900 },
+      ],
+    },
+  ],
+  always_deny: ["agent.patch.apply", "agent.patch.promote", "source_code.direct_patch", "smith.proposal.approve"],
   cooldown_seconds: 600,
 };
 

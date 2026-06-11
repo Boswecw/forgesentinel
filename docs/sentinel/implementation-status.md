@@ -11,11 +11,11 @@ repository; `partial` — meaningful subset implemented; `not started`.
 |---|---|---|---|
 | 0 | Architecture lock and contracts | done (MVP) | All contracts in `src/contracts/`; golden fixtures + manifest in `fixtures/golden/`; unknown-major rejection and additive-minor acceptance tested. TypeScript is the single contract source; Rust bindings pending (ADR-025). |
 | 1 | Evidence spine | done (MVP) | Gateway (auth, signatures, idempotency, explicit rejections), append-only ledger with WAL + corrections, local/cloud field policy, tenant-isolation denials, replay CLI. Centipede import format not yet implemented. |
-| 2 | Sentinel-Cost | partial | Extreme spike, sustained growth, retry storm in shadow with scoped robust baselines. Cache-collapse, billing-divergence, and quota-correlation findings pending. |
+| 2 | Sentinel-Cost | done (MVP) | Extreme spike, sustained growth, retry storm, cache collapse, billing divergence (estimate/finalized kept separate), and quota bypass — all in shadow with scoped robust baselines. Forge_Command cost view is Wave 4 scope. |
 | 3 | Sentinel-Cloud | partial | Key/region/device novelty + login-failure bursts in shadow; reversible key pause/resume + MFA require via capability-validated identity authority adapter. Implausible travel, session replay, service-identity findings pending. |
 | 4 | Forge_Command incident surface | not started | Incident/briefing contracts and CLI shadow report exist as the data layer; UI lives in the Forge_Command repository. |
-| 5 | Sentinel-Agent | not started | Agent event families registered in contracts only. |
-| 6 | Sentinel-Provider + NeuroForge | partial | Model fingerprint + scoped trust-vector contracts and material-change detection helper; routing integration pending. |
+| 5 | Sentinel-Agent | done (MVP) | Fingerprint-scoped features (release boundaries cannot mix baselines), boundary-violation/patch-burst/denial/loop findings, compound drift correlation, `sentinel_agent_drift@1.0.0` policy, YellowJacket stop + exact-version quarantine with receipted re-enable. All five Wave 5 exit-gate items tested. Sandbox replay and SMITH handoff projection pending. |
+| 6 | Sentinel-Provider + NeuroForge | partial | Fingerprint registry with alias-change findings; trust reset on material change (no silent inheritance, historical identity retained); sensitive-category eligibility gate. EMA integration, challenger shadow evaluation, and NeuroForge routing integration pending. |
 | 7 | Sentinel-License | not started | License/billing event families and signature-required ingestion enforced; detector pending. |
 | 8 | Sentinel-Data | partial (early) | Cross-tenant denial recording and cloud field policy enforced at the ledger now (the plan's reason to defer Sentinel-Data was the need for these foundations). Export/egress detectors pending. |
 | 9 | Sentinel Prime | partial | Deterministic compound correlation, independence accounting, feedback-loop exclusion, conflict preservation, duplicate merge, lifecycle. ML correlation deliberately deferred (ADR-018). |
@@ -38,10 +38,12 @@ repository; `partial` — meaningful subset implemented; `not started`.
 - SNT-010 Event Gateway — **done (MVP)**
 - SNT-020 Evidence Ledger — **done (MVP)** (DataForge service integration pending)
 - SNT-030 Feature/Baseline Service — **done (MVP)**
-- SNT-100 Sentinel-Cost — **partial**
+- SNT-100 Sentinel-Cost — **done (MVP)**
 - SNT-110 Sentinel-Cloud — **partial**
 - SNT-115 CSSA Evidence Adapter — **partial**
-- SNT-120/130/140/150 remaining nodes — **not started** (130 contracts exist)
+- SNT-120 Sentinel-Agent — **done (MVP)** (sandbox replay + SMITH handoff pending)
+- SNT-130 Sentinel-Provider — **partial** (fingerprint registry + trust reset; NeuroForge integration pending)
+- SNT-140/150 License + Data nodes — **not started**
 - SNT-200 Sentinel Prime — **partial (deterministic MVP)**
 - SNT-205 CSSA Finding Normalization — **done (MVP)**
 - SNT-210 Policy Service — **done (MVP)**

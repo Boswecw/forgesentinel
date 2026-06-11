@@ -25,11 +25,13 @@ Implementation status by wave/epic: [`docs/sentinel/implementation-status.md`](d
 | Event Gateway: producer auth, signature checks, schema/major-version rejection, tenant/environment boundary, idempotency, explicit rejections | `src/spine/gateway.ts` | Wave 1, SNT-010 |
 | Evidence ledger: append-only with corrections, local/cloud field policy, tenant isolation with recorded denials, WAL persistence, replay | `src/spine/ledger.ts` | Wave 1, SNT-020 |
 | Features and baselines: versioned definitions, median/MAD robust statistics, bounded-influence EMA, scope fallback, poisoning protections | `src/intel/features.ts`, `src/intel/baselines.ts` | SNT-030 |
-| Sentinel-Cost (shadow): extreme spike, sustained growth, retry storm | `src/intel/cost.ts` | Wave 2, SNT-100 |
+| Sentinel-Cost (shadow): extreme spike, sustained growth, retry storm, cache collapse, billing divergence, quota bypass | `src/intel/cost.ts` | Wave 2, SNT-100 |
 | Sentinel-Cloud (shadow): key/region/device novelty, login-failure bursts | `src/intel/cloud.ts` | Wave 3, SNT-110 |
-| Sentinel Prime: deterministic compound correlation, evidence-independence accounting, feedback-loop exclusion, conflict preservation, duplicate merge, lifecycle | `src/intel/prime.ts` | SNT-200 (deterministic MVP) |
-| Policy service: versioned `sentinel_account_compromise@3.1.0`, always-deny enforcement, cooldown, approval levels | `src/authority/policy.ts` | SNT-210 |
-| Capability tokens + executor validation + receipts + rollback | `src/authority/capability.ts`, `executor.ts`, `receipts.ts` | SNT-220 |
+| Sentinel-Agent (shadow): fingerprint-scoped patch-burst/boundary/denial/loop findings | `src/intel/agent.ts` | Wave 5, SNT-120 |
+| Sentinel-Provider (shadow): fingerprint registry, alias-change findings, trust reset without inheritance | `src/intel/provider.ts` | Wave 6, SNT-130 |
+| Sentinel Prime: deterministic compound correlation (account compromise + agent drift), evidence-independence accounting, feedback-loop exclusion, conflict preservation, duplicate merge, lifecycle | `src/intel/prime.ts` | SNT-200 (deterministic MVP) |
+| Policy service: versioned `sentinel_account_compromise@3.1.0` and `sentinel_agent_drift@1.0.0`, always-deny enforcement, cooldown, approval levels | `src/authority/policy.ts` | SNT-210 |
+| Capability tokens + executor validation + receipts + rollback (Identity and YellowJacket authorities) | `src/authority/capability.ts`, `executor.ts`, `yellowjacket.ts`, `receipts.ts` | SNT-220 |
 | CSSA control issuer/registry: signed scoped expiring directives, raw-incident rejection, replay defense, rollback receipts | `src/authority/cssa-control.ts` | Gate D |
 | Replay CLI and shadow pipeline | `src/cli.ts`, `src/runtime.ts` | Wave 1 replay CLI |
 
@@ -42,7 +44,7 @@ adapter.
 
 ```bash
 npm install
-npm test                # build + 67 tests against plan exit gates
+npm test                # build + 83 tests against plan exit gates
 npm run fixtures        # regenerate deterministic fixtures
 
 # Replay the end-to-end scenario from the plan (new key + new region +
@@ -51,6 +53,10 @@ node dist/src/cli.js replay fixtures/replay/compound_account_compromise.jsonl
 
 # A usage spike alone must stay advisory:
 node dist/src/cli.js replay fixtures/replay/usage_spike_only.jsonl
+
+# Agent drift: patch burst + denials + boundary violation -> stop run +
+# quarantine the exact agent version (re-enable path receipted):
+node dist/src/cli.js replay fixtures/replay/agent_drift.jsonl
 
 # Validate documents against contracts:
 node dist/src/cli.js validate event fixtures/golden/event.usage_tokens_recorded.json

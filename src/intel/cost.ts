@@ -1,11 +1,15 @@
 import { clamp01 } from "../contracts/common.js";
+import type { EventEnvelope } from "../contracts/envelope.js";
 import type { EvidenceRecord } from "../contracts/evidence.js";
 import type { Finding } from "../contracts/finding.js";
-import { FeatureService, featureEvidence } from "./features.js";
+import { FeatureService, eventEvidence, featureEvidence } from "./features.js";
 import { BaselineService } from "./baselines.js";
 
 export const TOKENS_PER_DAY = "cost.tokens_per_day@2.0.0";
 export const RETRIES_PER_HOUR = "cost.retries_per_hour@1.0.0";
+export const CACHE_HIT_RATE_24H = "cost.cache_hit_rate_24h@1.0.0";
+export const COST_ESTIMATED_PER_DAY = "cost.estimated_per_day@1.0.0";
+export const COST_FINALIZED_PER_DAY = "cost.finalized_per_day@1.0.0";
 export const DAILY_USAGE_BASELINE = "cost.account_daily_usage";
 
 /**
@@ -19,6 +23,12 @@ export interface CostNodeConfig {
   sustained_growth_ratio: number;
   sustained_growth_windows: number;
   retry_storm_count: number;
+  cache_collapse_current_rate: number;
+  cache_collapse_historical_rate: number;
+  cache_collapse_min_requests: number;
+  cache_collapse_min_history_windows: number;
+  billing_divergence_ratio: number;
+  billing_divergence_min_estimate: number;
 }
 
 export const DEFAULT_COST_CONFIG: CostNodeConfig = {
@@ -27,6 +37,12 @@ export const DEFAULT_COST_CONFIG: CostNodeConfig = {
   sustained_growth_ratio: 3,
   sustained_growth_windows: 3,
   retry_storm_count: 50,
+  cache_collapse_current_rate: 0.2,
+  cache_collapse_historical_rate: 0.5,
+  cache_collapse_min_requests: 20,
+  cache_collapse_min_history_windows: 7,
+  billing_divergence_ratio: 0.25,
+  billing_divergence_min_estimate: 1,
 };
 
 /** Actions this node may never recommend (03 forbidden direct actions). */
@@ -149,6 +165,91 @@ export class SentinelCostNode {
     }
 
     return { findings, evidence };
+  }
+
+  /**
+   * Account-level findings that need cost/billing/quota event context:
+   * cache collapse, estimate/finalized billing divergence, and quota bypass.
+   * Estimate and finalized cost remain separate values throughout (SNT-100).
+   */
+  evaluateAccountEvents(events: EventEnvelope[], scope: { tenant_id: string; account_id: string }, atIso: string): NodeOutput {
+    const findings: Finding[] = [];
+    const evidence: EvidenceRecord[] = [];
+    const scopeKey = `tenant_id=${scope.tenant_id}|account_id=${scope.account_id}`;
+    const fullScope = { ...scope, route_class: "account_wide" };
+
+    const cacheCurrent = this.features.evaluateWindow(CACHE_HIT_RATE_24H, scopeKey, atIso);
+    if (cacheCurrent.sample_count >= this.config.cache_collapse_min_requests && cacheCurrent.value <= this.config.cache_collapse_current_rate) {
+      const history = this.features
+        .history(CACHE_HIT_RATE_24H, scopeKey, atIso, 30)
+        .filter((window) => window.sample_count >= 5);
+      if (history.length >= this.config.cache_collapse_min_history_windows) {
+        const historicalMean = history.reduce((sum, window) => sum + window.value, 0) / history.length;
+        if (historicalMean >= this.config.cache_collapse_historical_rate) {
+          const record = featureEvidence(cacheCurrent, "hit_rate", scope, false);
+          evidence.push(record);
+          findings.push(this.simpleFinding("cost.cache_collapse", fullScope, cacheCurrent.window, record, {
+            likelihood: 0.5,
+            impact: 0.55,
+            confidence: 0.7,
+            evidence_quality: record.quality.score,
+          }, `Cache hit rate fell to ${(cacheCurrent.value * 100).toFixed(0)}% against a historical ${(historicalMean * 100).toFixed(0)}%; every miss is now billable provider work.`, atIso, "RECOMMEND_ONLY"));
+        }
+      }
+    }
+
+    const estimated = this.features.evaluateWindow(COST_ESTIMATED_PER_DAY, scopeKey, atIso);
+    const finalized = this.features.evaluateWindow(COST_FINALIZED_PER_DAY, scopeKey, atIso);
+    if (estimated.value >= this.config.billing_divergence_min_estimate && finalized.sample_count > 0) {
+      const divergence = Math.abs(finalized.value - estimated.value) / estimated.value;
+      if (divergence >= this.config.billing_divergence_ratio) {
+        const record = featureEvidence(finalized, "currency_units/day", scope, false);
+        evidence.push(record);
+        findings.push(this.simpleFinding("cost.billing_divergence", fullScope, finalized.window, record, {
+          likelihood: 0.6,
+          impact: 0.7,
+          // Arithmetic over verified usage records: high confidence in the
+          // divergence itself; the cause still needs reconciliation.
+          confidence: 0.8,
+          evidence_quality: record.quality.score,
+        }, `Finalized cost diverges ${(divergence * 100).toFixed(0)}% from estimated cost (estimated ${estimated.value.toFixed(2)}, finalized ${finalized.value.toFixed(2)}). Open billing reconciliation.`, atIso, "REQUEST_OPERATOR"));
+      }
+    }
+
+    findings.push(...this.quotaBypass(events, scope, evidence, atIso));
+    return { findings, evidence };
+  }
+
+  private quotaBypass(events: EventEnvelope[], scope: { tenant_id: string; account_id: string }, evidence: EvidenceRecord[], atIso: string): Finding[] {
+    const forAccount = events.filter((event) => event.tenant?.tenant_id === scope.tenant_id && event.tenant?.account_id === scope.account_id);
+    const exceeded = forAccount
+      .filter((event) => event.event_type === "usage.quota.exceeded")
+      .sort((a, b) => Date.parse(a.occurred_at) - Date.parse(b.occurred_at))
+      .at(-1);
+    if (!exceeded) return [];
+    const exceededAt = Date.parse(exceeded.occurred_at);
+    const usageAfter = forAccount.filter(
+      (event) => event.event_type === "usage.tokens.recorded" && Date.parse(event.occurred_at) > exceededAt,
+    );
+    if (usageAfter.length === 0) return [];
+    const overageAllowed = forAccount.some(
+      (event) =>
+        event.event_type === "license.feature.allowed" &&
+        event.payload["feature"] === "paid_overage" &&
+        Date.parse(event.occurred_at) <= Date.parse(usageAfter[0]!.occurred_at),
+    );
+    if (overageAllowed) return [];
+    const record = eventEvidence(exceeded, scope);
+    record.source_event_ids = [exceeded.event_id, ...usageAfter.map((event) => event.event_id)];
+    evidence.push(record);
+    return [
+      this.simpleFinding("cost.quota_bypass", { ...scope, route_class: "account_wide" }, { start: exceeded.occurred_at, end: usageAfter.at(-1)!.occurred_at }, record, {
+        likelihood: 0.7,
+        impact: 0.75,
+        confidence: 0.85,
+        evidence_quality: record.quality.score,
+      }, `${usageAfter.length} usage event(s) recorded after quota was exceeded with no paid-overage entitlement in effect.`, atIso, "REQUEST_OPERATOR"),
+    ];
   }
 
   private sustainedGrowth(scopeKey: string, atIso: string, expected: number): boolean {

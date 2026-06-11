@@ -9,10 +9,12 @@ import { EventGateway } from "./spine/gateway.js";
 import { replayInto, type ReplayLine, type ReplaySummary } from "./spine/replay.js";
 import { FeatureService } from "./intel/features.js";
 import { BaselineService } from "./intel/baselines.js";
-import { SentinelCostNode, TOKENS_PER_DAY, RETRIES_PER_HOUR, DAILY_USAGE_BASELINE } from "./intel/cost.js";
-import { SentinelCloudNode, LOGIN_FAILURES_15M } from "./intel/cloud.js";
-import { SentinelPrime, ACCOUNT_COMPROMISE_COMPOUND } from "./intel/prime.js";
-import { PolicyService, ACCOUNT_COMPROMISE_POLICY } from "./authority/policy.js";
+import { SentinelCostNode, TOKENS_PER_DAY, DAILY_USAGE_BASELINE } from "./intel/cost.js";
+import { SentinelCloudNode } from "./intel/cloud.js";
+import { SentinelAgentNode } from "./intel/agent.js";
+import { SentinelProviderNode } from "./intel/provider.js";
+import { SentinelPrime, ACCOUNT_COMPROMISE_COMPOUND, AGENT_DRIFT_COMPOUND } from "./intel/prime.js";
+import { PolicyService, ACCOUNT_COMPROMISE_POLICY, AGENT_DRIFT_POLICY } from "./authority/policy.js";
 import { ReceiptService } from "./authority/receipts.js";
 
 const DAY_MS = 24 * 3600 * 1000;
@@ -51,6 +53,8 @@ export class SentinelRuntime {
   readonly baselines = new BaselineService();
   readonly costNode: SentinelCostNode;
   readonly cloudNode: SentinelCloudNode;
+  readonly agentNode: SentinelAgentNode;
+  readonly providerNode: SentinelProviderNode;
   readonly prime: SentinelPrime;
   readonly policy = new PolicyService();
   readonly receipts: ReceiptService;
@@ -88,6 +92,60 @@ export class SentinelRuntime {
       aggregation: { operation: "count" },
       privacy: { stores_content: false, cloud_allowed: true, retention_class: "security_365d" },
     });
+    this.features.register({
+      feature_id: "cost.cache_hit_rate_24h",
+      version: "1.0.0",
+      source_events: ["neuroforge.inference.completed"],
+      scope: ["tenant_id", "account_id"],
+      window: { type: "rolling", duration_ms: DAY_MS, lateness_allowance_ms: 15 * 60 * 1000 },
+      aggregation: { operation: "mean", field: "payload.cache_hit" },
+      privacy: { stores_content: false, cloud_allowed: true, retention_class: "security_365d" },
+    });
+    this.features.register({
+      feature_id: "cost.estimated_per_day",
+      version: "1.0.0",
+      source_events: ["usage.cost.estimated"],
+      scope: ["tenant_id", "account_id"],
+      window: { type: "rolling", duration_ms: DAY_MS, lateness_allowance_ms: 15 * 60 * 1000 },
+      aggregation: { operation: "sum", field: "payload.amount" },
+      privacy: { stores_content: false, cloud_allowed: true, retention_class: "billing_contract" },
+    });
+    this.features.register({
+      feature_id: "cost.finalized_per_day",
+      version: "1.0.0",
+      source_events: ["usage.cost.finalized"],
+      scope: ["tenant_id", "account_id"],
+      window: { type: "rolling", duration_ms: DAY_MS, lateness_allowance_ms: 15 * 60 * 1000 },
+      aggregation: { operation: "sum", field: "payload.amount" },
+      privacy: { stores_content: false, cloud_allowed: true, retention_class: "billing_contract" },
+    });
+    this.features.register({
+      feature_id: "agent.patches_per_hour",
+      version: "1.0.0",
+      source_events: ["agent.patch.proposed", "agent.patch.applied"],
+      scope: ["tenant_id", "agent_fingerprint"],
+      window: { type: "rolling", duration_ms: HOUR_MS, lateness_allowance_ms: 5 * 60 * 1000 },
+      aggregation: { operation: "count" },
+      privacy: { stores_content: false, cloud_allowed: true, retention_class: "security_365d" },
+    });
+    this.features.register({
+      feature_id: "agent.denials_per_hour",
+      version: "1.0.0",
+      source_events: ["agent.permission.denied", "yellowjacket.admission.denied"],
+      scope: ["tenant_id", "agent_fingerprint"],
+      window: { type: "rolling", duration_ms: HOUR_MS, lateness_allowance_ms: 5 * 60 * 1000 },
+      aggregation: { operation: "count" },
+      privacy: { stores_content: false, cloud_allowed: true, retention_class: "security_365d" },
+    });
+    this.features.register({
+      feature_id: "agent.runs_per_hour",
+      version: "1.0.0",
+      source_events: ["agent.run.started"],
+      scope: ["tenant_id", "agent_fingerprint"],
+      window: { type: "rolling", duration_ms: HOUR_MS, lateness_allowance_ms: 5 * 60 * 1000 },
+      aggregation: { operation: "count" },
+      privacy: { stores_content: false, cloud_allowed: true, retention_class: "security_365d" },
+    });
 
     this.baselines.register({
       baseline_id: DAILY_USAGE_BASELINE,
@@ -104,8 +162,11 @@ export class SentinelRuntime {
 
     this.costNode = new SentinelCostNode(this.features, this.baselines);
     this.cloudNode = new SentinelCloudNode(this.features);
-    this.prime = new SentinelPrime([ACCOUNT_COMPROMISE_COMPOUND]);
+    this.agentNode = new SentinelAgentNode(this.features);
+    this.providerNode = new SentinelProviderNode();
+    this.prime = new SentinelPrime([ACCOUNT_COMPROMISE_COMPOUND, AGENT_DRIFT_COMPOUND]);
     this.policy.register(ACCOUNT_COMPROMISE_POLICY);
+    this.policy.register(AGENT_DRIFT_POLICY);
   }
 
   /**
@@ -139,9 +200,32 @@ export class SentinelRuntime {
       evidence.push(...output.evidence);
     }
 
+    const accountScopes = new Map<string, { tenant_id: string; account_id: string }>();
+    for (const event of events) {
+      if (event.tenant?.tenant_id && event.tenant.account_id) {
+        accountScopes.set(`${event.tenant.tenant_id}/${event.tenant.account_id}`, {
+          tenant_id: event.tenant.tenant_id,
+          account_id: event.tenant.account_id,
+        });
+      }
+    }
+    for (const scope of accountScopes.values()) {
+      const output = this.costNode.evaluateAccountEvents(events, scope, lastIso);
+      findings.push(...output.findings);
+      evidence.push(...output.evidence);
+    }
+
     const cloudOutput = this.cloudNode.process(events, learnCutoff);
     findings.push(...cloudOutput.findings);
     evidence.push(...cloudOutput.evidence);
+
+    const agentOutput = this.agentNode.process(events);
+    findings.push(...agentOutput.findings);
+    evidence.push(...agentOutput.evidence);
+
+    const providerOutput = this.providerNode.process(events);
+    findings.push(...providerOutput.findings);
+    evidence.push(...providerOutput.evidence);
 
     for (const record of evidence) {
       this.ledger.append({ kind: "evidence", gateway_version: "feature-service.1.0.0", validation: "accepted", transformation_version: "1.0.0", ...(record.scope["tenant_id"] !== undefined ? { tenant_id: record.scope["tenant_id"] } : {}), body: record });
