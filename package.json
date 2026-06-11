@@ -1,0 +1,28 @@
+{
+  "name": "forgesentinel",
+  "version": "0.1.0",
+  "description": "Forge Sentinel — governed security-intelligence fabric (Waves 0-3 MVP slice)",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "npm run build --silent && node --test 'dist/test/*.test.js'",
+    "build": "tsc -p tsconfig.json",
+    "fixtures": "npm run build --silent && node dist/tools/gen-fixtures.js",
+    "cli": "node dist/src/cli.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://local_proxy@127.0.0.1:37839/git/Boswecw/forgesentinel"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "UNLICENSED",
+  "type": "module",
+  "private": "true",
+  "devDependencies": {
+    "@types/node": "^22.19.21",
+    "typescript": "5.6"
+  }
+}

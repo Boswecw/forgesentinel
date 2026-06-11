@@ -1,0 +1,61 @@
+{
+  "finding_id": "fnd_golden_001",
+  "finding_type": "cost.usage_change_extreme",
+  "node": {
+    "name": "sentinel-cost",
+    "version": "1.0.0"
+  },
+  "subject": {
+    "type": "account",
+    "id": "acct_2041"
+  },
+  "tenant_id": "ten_demo",
+  "window": {
+    "start": "2026-06-08T17:00:00.000Z",
+    "end": "2026-06-09T17:00:00.000Z"
+  },
+  "risk": {
+    "likelihood": 0.74,
+    "impact": 0.82,
+    "confidence": 0.69,
+    "evidence_quality": 0.95
+  },
+  "baseline": {
+    "baseline_id": "cost.account_daily_usage@1.1.0",
+    "expected": 100000,
+    "observed": 15000000,
+    "change_ratio": 150
+  },
+  "evidence_ids": [
+    "evd_000001"
+  ],
+  "source_event_roots": [
+    "feature:cost.tokens_per_day@2.0.0:tenant_id=ten_demo|account_id=acct_2041|route_class=general_cloud"
+  ],
+  "explanation": {
+    "summary": "Daily token usage increased 150x above the account baseline.",
+    "top_factors": [
+      {
+        "factor": "usage_change_ratio",
+        "contribution": 0.62
+      },
+      {
+        "factor": "new_api_key",
+        "contribution": 0.21
+      }
+    ],
+    "uncertainties": [
+      "The account may be running an approved bulk workload."
+    ]
+  },
+  "recommendation": {
+    "action_class": "REQUEST_OPERATOR",
+    "playbook": "PB-COST-COMPROMISE-01"
+  },
+  "expires_at": "2026-06-10T17:00:00.000Z",
+  "correlation_hints": {
+    "account_id": "acct_2041",
+    "route_class": "general_cloud"
+  },
+  "policy_generated_effect": false
+}

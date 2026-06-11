@@ -1,0 +1,42 @@
+[
+  {
+    "file": "event.usage_tokens_recorded.json",
+    "contract": "event",
+    "expect_valid": true
+  },
+  {
+    "file": "event.invalid_unknown_major_version.json",
+    "contract": "event",
+    "expect_valid": false
+  },
+  {
+    "file": "event.invalid_restricted_content_cloud.json",
+    "contract": "event",
+    "expect_valid": false
+  },
+  {
+    "file": "finding.cost_usage_change_extreme.json",
+    "contract": "finding",
+    "expect_valid": true
+  },
+  {
+    "file": "incident.compound_account_compromise.json",
+    "contract": "incident",
+    "expect_valid": true
+  },
+  {
+    "file": "receipt.api_key_pause.json",
+    "contract": "receipt",
+    "expect_valid": true
+  },
+  {
+    "file": "directive.cloud_route_hold.json",
+    "contract": "directive",
+    "expect_valid": true
+  },
+  {
+    "file": "directive.invalid_unknown_field.json",
+    "contract": "directive",
+    "expect_valid": false
+  }
+]
