@@ -9,6 +9,7 @@ export * from "./intel/baselines.js";
 export * from "./intel/cost.js";
 export * from "./intel/cloud.js";
 export * from "./intel/agent.js";
+export * from "./intel/license.js";
 export * from "./intel/prime.js";
 export * from "./authority/policy.js";
 export * from "./authority/capability.js";
