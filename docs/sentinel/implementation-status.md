@@ -17,7 +17,7 @@ repository; `partial` — meaningful subset implemented; `not started`.
 | 5 | Sentinel-Agent | done (MVP) | **patch-burst** (per-agent rolling count), **boundary-violation** (direct `agent.boundary.violated`), and **denied-action-burst** detectors in shadow; recommends stop-run / shadow-the-version / SMITH-review and never applies or promotes a patch (`AGENT_FORBIDDEN_ACTIONS`). Covered by `test/agent.test.ts`. |
 | 6 | Sentinel-Provider + NeuroForge | partial | Model fingerprint + scoped trust-vector contracts and material-change detection helper; routing integration pending. |
 | 7 | Sentinel-License | done (MVP) | License/billing event families + signature-required ingestion (invalid signature fails closed at the gateway). Detectors: **entitlement-rejected** (surfaces a failed validation), **device-activation-abuse** (per-account daily rate), and **Stripe/entitlement-divergence** (feature granted while subscription canceled/unpaid/past_due). Recommend-only; cannot permanently revoke (`LICENSE_FORBIDDEN_ACTIONS`). Covered by `test/license.test.ts`. |
-| 8 | Sentinel-Data | partial (early) | Cross-tenant denial recording and cloud field policy enforced at the ledger now (the plan's reason to defer Sentinel-Data was the need for these foundations). Export/egress detectors pending. |
+| 8 | Sentinel-Data | done (MVP) | Cross-tenant denial recording + cloud field policy enforced at the ledger (foundations). Detectors: **egress-anomaly** (per-account hourly export rate), **cross-tenant-access** (surfaces `data.cross_tenant.denied`), and **redaction-failure** (`data.redaction.failed`). Recommend-only; never deletes evidence or exports unredacted (`DATA_FORBIDDEN_ACTIONS`). Covered by `test/data.test.ts`. Retention-failure pending (no `data.retention.failed` event type yet). |
 | 9 | Sentinel Prime | partial | Deterministic compound correlation, independence accounting, feedback-loop exclusion, conflict preservation, duplicate merge, lifecycle. ML correlation deliberately deferred (ADR-018). |
 | 10 | Governed learning | not started | Feedback-label contract with training-eligibility/privacy gating exists; calibration pipeline pending. |
 | 11 | Production hardening | not started | |
@@ -41,7 +41,7 @@ repository; `partial` — meaningful subset implemented; `not started`.
 - SNT-100 Sentinel-Cost — **done (MVP)**
 - SNT-110 Sentinel-Cloud — **done (MVP)**
 - SNT-115 CSSA Evidence Adapter — **partial**
-- SNT-120 Sentinel-Agent + SNT-140 Sentinel-License — **done (MVP)**; SNT-130 (Provider) / SNT-150 (Data) — **not started** (130 contracts exist)
+- SNT-120 Agent + SNT-140 License + SNT-150 Data — **done (MVP)**; SNT-130 (Provider) — **not started** (130 contracts exist)
 - SNT-200 Sentinel Prime — **partial (deterministic MVP)**
 - SNT-205 CSSA Finding Normalization — **done (MVP)**
 - SNT-210 Policy Service — **done (MVP)**

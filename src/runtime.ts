@@ -13,6 +13,7 @@ import { SentinelCostNode, TOKENS_PER_DAY, RETRIES_PER_HOUR, DAILY_USAGE_BASELIN
 import { SentinelCloudNode, LOGIN_FAILURES_15M } from "./intel/cloud.js";
 import { SentinelAgentNode } from "./intel/agent.js";
 import { SentinelLicenseNode } from "./intel/license.js";
+import { SentinelDataNode } from "./intel/data.js";
 import { SentinelPrime, ACCOUNT_COMPROMISE_COMPOUND } from "./intel/prime.js";
 import { PolicyService, ACCOUNT_COMPROMISE_POLICY } from "./authority/policy.js";
 import { ReceiptService } from "./authority/receipts.js";
@@ -55,6 +56,7 @@ export class SentinelRuntime {
   readonly cloudNode: SentinelCloudNode;
   readonly agentNode: SentinelAgentNode;
   readonly licenseNode: SentinelLicenseNode;
+  readonly dataNode: SentinelDataNode;
   readonly prime: SentinelPrime;
   readonly policy = new PolicyService();
   readonly receipts: ReceiptService;
@@ -167,6 +169,16 @@ export class SentinelRuntime {
       aggregation: { operation: "count" },
       privacy: { stores_content: false, cloud_allowed: true, retention_class: "security_365d" },
     });
+    // Sentinel-Data (Wave 8): export rate per account (egress anomaly).
+    this.features.register({
+      feature_id: "data.exports_per_hour",
+      version: "1.0.0",
+      source_events: ["data.object.exported"],
+      scope: ["tenant_id", "account_id"],
+      window: { type: "rolling", duration_ms: HOUR_MS, lateness_allowance_ms: 5 * 60 * 1000 },
+      aggregation: { operation: "count" },
+      privacy: { stores_content: false, cloud_allowed: true, retention_class: "security_365d" },
+    });
 
     this.baselines.register({
       baseline_id: DAILY_USAGE_BASELINE,
@@ -197,6 +209,7 @@ export class SentinelRuntime {
     this.cloudNode = new SentinelCloudNode(this.features);
     this.agentNode = new SentinelAgentNode(this.features);
     this.licenseNode = new SentinelLicenseNode(this.features);
+    this.dataNode = new SentinelDataNode(this.features);
     this.prime = new SentinelPrime([ACCOUNT_COMPROMISE_COMPOUND]);
     this.policy.register(ACCOUNT_COMPROMISE_POLICY);
   }
@@ -257,6 +270,10 @@ export class SentinelRuntime {
     const licenseOutput = this.licenseNode.process(events, learnCutoff);
     findings.push(...licenseOutput.findings);
     evidence.push(...licenseOutput.evidence);
+
+    const dataOutput = this.dataNode.process(events, learnCutoff);
+    findings.push(...dataOutput.findings);
+    evidence.push(...dataOutput.evidence);
 
     for (const record of evidence) {
       this.ledger.append({ kind: "evidence", gateway_version: "feature-service.1.0.0", validation: "accepted", transformation_version: "1.0.0", ...(record.scope["tenant_id"] !== undefined ? { tenant_id: record.scope["tenant_id"] } : {}), body: record });
