@@ -14,7 +14,7 @@ repository; `partial` — meaningful subset implemented; `not started`.
 | 2 | Sentinel-Cost | done (MVP) | Extreme spike, sustained growth, retry storm, **cache-collapse** (robust hit-ratio baseline), **billing/usage-divergence** (metered estimate vs finalized), and **quota-bypass** (feeds Prime correlation) — all shadow/recommend-only, covered by `test/cost.test.ts`. |
 | 3 | Sentinel-Cloud | done (MVP) | Key/region/device novelty + login-failure bursts, **implausible-travel** (region-geo speed check), **session-replay** (session-id seen from ≥2 devices), and **service-identity-misuse** (privileged identity op by a service identity) in shadow; reversible key pause/resume + MFA require via capability-validated identity authority adapter. Covered by `test/cloud.test.ts`. |
 | 4 | Forge_Command incident surface | not started | Incident/briefing contracts and CLI shadow report exist as the data layer; UI lives in the Forge_Command repository. |
-| 5 | Sentinel-Agent | not started | Agent event families registered in contracts only. |
+| 5 | Sentinel-Agent | done (MVP) | **patch-burst** (per-agent rolling count), **boundary-violation** (direct `agent.boundary.violated`), and **denied-action-burst** detectors in shadow; recommends stop-run / shadow-the-version / SMITH-review and never applies or promotes a patch (`AGENT_FORBIDDEN_ACTIONS`). Covered by `test/agent.test.ts`. |
 | 6 | Sentinel-Provider + NeuroForge | partial | Model fingerprint + scoped trust-vector contracts and material-change detection helper; routing integration pending. |
 | 7 | Sentinel-License | not started | License/billing event families and signature-required ingestion enforced; detector pending. |
 | 8 | Sentinel-Data | partial (early) | Cross-tenant denial recording and cloud field policy enforced at the ledger now (the plan's reason to defer Sentinel-Data was the need for these foundations). Export/egress detectors pending. |
@@ -41,7 +41,7 @@ repository; `partial` — meaningful subset implemented; `not started`.
 - SNT-100 Sentinel-Cost — **done (MVP)**
 - SNT-110 Sentinel-Cloud — **done (MVP)**
 - SNT-115 CSSA Evidence Adapter — **partial**
-- SNT-120/130/140/150 remaining nodes — **not started** (130 contracts exist)
+- SNT-120 Sentinel-Agent — **done (MVP)**; SNT-130/140/150 remaining nodes — **not started** (130 contracts exist)
 - SNT-200 Sentinel Prime — **partial (deterministic MVP)**
 - SNT-205 CSSA Finding Normalization — **done (MVP)**
 - SNT-210 Policy Service — **done (MVP)**

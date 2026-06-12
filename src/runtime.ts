@@ -11,6 +11,7 @@ import { FeatureService } from "./intel/features.js";
 import { BaselineService } from "./intel/baselines.js";
 import { SentinelCostNode, TOKENS_PER_DAY, RETRIES_PER_HOUR, DAILY_USAGE_BASELINE, CACHE_HITS, CACHE_HIT_RATIO_BASELINE } from "./intel/cost.js";
 import { SentinelCloudNode, LOGIN_FAILURES_15M } from "./intel/cloud.js";
+import { SentinelAgentNode } from "./intel/agent.js";
 import { SentinelPrime, ACCOUNT_COMPROMISE_COMPOUND } from "./intel/prime.js";
 import { PolicyService, ACCOUNT_COMPROMISE_POLICY } from "./authority/policy.js";
 import { ReceiptService } from "./authority/receipts.js";
@@ -51,6 +52,7 @@ export class SentinelRuntime {
   readonly baselines = new BaselineService();
   readonly costNode: SentinelCostNode;
   readonly cloudNode: SentinelCloudNode;
+  readonly agentNode: SentinelAgentNode;
   readonly prime: SentinelPrime;
   readonly policy = new PolicyService();
   readonly receipts: ReceiptService;
@@ -134,6 +136,25 @@ export class SentinelRuntime {
       aggregation: { operation: "count" },
       privacy: { stores_content: false, cloud_allowed: true, retention_class: "security_365d" },
     });
+    // Sentinel-Agent (Wave 5): patch and denial bursts per agent identity.
+    this.features.register({
+      feature_id: "agent.patches_per_hour",
+      version: "1.0.0",
+      source_events: ["agent.patch.applied"],
+      scope: ["tenant_id", "actor_id"],
+      window: { type: "rolling", duration_ms: HOUR_MS, lateness_allowance_ms: 5 * 60 * 1000 },
+      aggregation: { operation: "count" },
+      privacy: { stores_content: false, cloud_allowed: true, retention_class: "security_365d" },
+    });
+    this.features.register({
+      feature_id: "agent.denials_per_15m",
+      version: "1.0.0",
+      source_events: ["agent.permission.denied"],
+      scope: ["tenant_id", "actor_id"],
+      window: { type: "rolling", duration_ms: 15 * 60 * 1000, lateness_allowance_ms: 60 * 1000 },
+      aggregation: { operation: "count" },
+      privacy: { stores_content: false, cloud_allowed: true, retention_class: "security_365d" },
+    });
 
     this.baselines.register({
       baseline_id: DAILY_USAGE_BASELINE,
@@ -162,6 +183,7 @@ export class SentinelRuntime {
 
     this.costNode = new SentinelCostNode(this.features, this.baselines);
     this.cloudNode = new SentinelCloudNode(this.features);
+    this.agentNode = new SentinelAgentNode(this.features);
     this.prime = new SentinelPrime([ACCOUNT_COMPROMISE_COMPOUND]);
     this.policy.register(ACCOUNT_COMPROMISE_POLICY);
   }
@@ -214,6 +236,10 @@ export class SentinelRuntime {
     const cloudOutput = this.cloudNode.process(events, learnCutoff);
     findings.push(...cloudOutput.findings);
     evidence.push(...cloudOutput.evidence);
+
+    const agentOutput = this.agentNode.process(events, learnCutoff);
+    findings.push(...agentOutput.findings);
+    evidence.push(...agentOutput.evidence);
 
     for (const record of evidence) {
       this.ledger.append({ kind: "evidence", gateway_version: "feature-service.1.0.0", validation: "accepted", transformation_version: "1.0.0", ...(record.scope["tenant_id"] !== undefined ? { tenant_id: record.scope["tenant_id"] } : {}), body: record });
