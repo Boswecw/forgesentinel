@@ -12,7 +12,7 @@ repository; `partial` — meaningful subset implemented; `not started`.
 | 0 | Architecture lock and contracts | done (MVP) | All contracts in `src/contracts/`; golden fixtures + manifest in `fixtures/golden/`; unknown-major rejection and additive-minor acceptance tested. TypeScript is the single contract source; Rust bindings pending (ADR-025). |
 | 1 | Evidence spine | done (MVP) | Gateway (auth, signatures, idempotency, explicit rejections), append-only ledger with WAL + corrections, local/cloud field policy, tenant-isolation denials, replay CLI. Centipede import format not yet implemented. |
 | 2 | Sentinel-Cost | done (MVP) | Extreme spike, sustained growth, retry storm, **cache-collapse** (robust hit-ratio baseline), **billing/usage-divergence** (metered estimate vs finalized), and **quota-bypass** (feeds Prime correlation) — all shadow/recommend-only, covered by `test/cost.test.ts`. |
-| 3 | Sentinel-Cloud | partial | Key/region/device novelty + login-failure bursts in shadow; reversible key pause/resume + MFA require via capability-validated identity authority adapter. Implausible travel, session replay, service-identity findings pending. |
+| 3 | Sentinel-Cloud | done (MVP) | Key/region/device novelty + login-failure bursts, **implausible-travel** (region-geo speed check), **session-replay** (session-id seen from ≥2 devices), and **service-identity-misuse** (privileged identity op by a service identity) in shadow; reversible key pause/resume + MFA require via capability-validated identity authority adapter. Covered by `test/cloud.test.ts`. |
 | 4 | Forge_Command incident surface | not started | Incident/briefing contracts and CLI shadow report exist as the data layer; UI lives in the Forge_Command repository. |
 | 5 | Sentinel-Agent | not started | Agent event families registered in contracts only. |
 | 6 | Sentinel-Provider + NeuroForge | partial | Model fingerprint + scoped trust-vector contracts and material-change detection helper; routing integration pending. |
@@ -39,7 +39,7 @@ repository; `partial` — meaningful subset implemented; `not started`.
 - SNT-020 Evidence Ledger — **done (MVP)** (DataForge service integration pending)
 - SNT-030 Feature/Baseline Service — **done (MVP)**
 - SNT-100 Sentinel-Cost — **done (MVP)**
-- SNT-110 Sentinel-Cloud — **partial**
+- SNT-110 Sentinel-Cloud — **done (MVP)**
 - SNT-115 CSSA Evidence Adapter — **partial**
 - SNT-120/130/140/150 remaining nodes — **not started** (130 contracts exist)
 - SNT-200 Sentinel Prime — **partial (deterministic MVP)**
