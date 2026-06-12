@@ -9,7 +9,7 @@ import { EventGateway } from "./spine/gateway.js";
 import { replayInto, type ReplayLine, type ReplaySummary } from "./spine/replay.js";
 import { FeatureService } from "./intel/features.js";
 import { BaselineService } from "./intel/baselines.js";
-import { SentinelCostNode, TOKENS_PER_DAY, RETRIES_PER_HOUR, DAILY_USAGE_BASELINE } from "./intel/cost.js";
+import { SentinelCostNode, TOKENS_PER_DAY, RETRIES_PER_HOUR, DAILY_USAGE_BASELINE, CACHE_HITS, CACHE_HIT_RATIO_BASELINE } from "./intel/cost.js";
 import { SentinelCloudNode, LOGIN_FAILURES_15M } from "./intel/cloud.js";
 import { SentinelPrime, ACCOUNT_COMPROMISE_COMPOUND } from "./intel/prime.js";
 import { PolicyService, ACCOUNT_COMPROMISE_POLICY } from "./authority/policy.js";
@@ -88,6 +88,52 @@ export class SentinelRuntime {
       aggregation: { operation: "count" },
       privacy: { stores_content: false, cloud_allowed: true, retention_class: "security_365d" },
     });
+    // Sentinel-Cost (Wave 2): cache ratio, billing reconciliation, quota breach.
+    this.features.register({
+      feature_id: "cost.cache_hits",
+      version: "1.0.0",
+      source_events: ["usage.tokens.recorded"],
+      scope: ["tenant_id", "account_id", "route_class"],
+      window: { type: "rolling", duration_ms: DAY_MS, lateness_allowance_ms: 15 * 60 * 1000 },
+      aggregation: { operation: "sum", field: "payload.cache_hits" },
+      privacy: { stores_content: false, cloud_allowed: true, retention_class: "security_365d" },
+    });
+    this.features.register({
+      feature_id: "cost.cache_misses",
+      version: "1.0.0",
+      source_events: ["usage.tokens.recorded"],
+      scope: ["tenant_id", "account_id", "route_class"],
+      window: { type: "rolling", duration_ms: DAY_MS, lateness_allowance_ms: 15 * 60 * 1000 },
+      aggregation: { operation: "sum", field: "payload.cache_misses" },
+      privacy: { stores_content: false, cloud_allowed: true, retention_class: "security_365d" },
+    });
+    this.features.register({
+      feature_id: "cost.estimated_cents",
+      version: "1.0.0",
+      source_events: ["usage.cost.estimated"],
+      scope: ["tenant_id", "account_id"],
+      window: { type: "rolling", duration_ms: DAY_MS, lateness_allowance_ms: 15 * 60 * 1000 },
+      aggregation: { operation: "sum", field: "payload.cost_cents" },
+      privacy: { stores_content: false, cloud_allowed: true, retention_class: "security_365d" },
+    });
+    this.features.register({
+      feature_id: "cost.finalized_cents",
+      version: "1.0.0",
+      source_events: ["usage.cost.finalized"],
+      scope: ["tenant_id", "account_id"],
+      window: { type: "rolling", duration_ms: DAY_MS, lateness_allowance_ms: 15 * 60 * 1000 },
+      aggregation: { operation: "sum", field: "payload.cost_cents" },
+      privacy: { stores_content: false, cloud_allowed: true, retention_class: "security_365d" },
+    });
+    this.features.register({
+      feature_id: "cost.quota_exceeded_per_day",
+      version: "1.0.0",
+      source_events: ["usage.quota.exceeded"],
+      scope: ["tenant_id", "account_id"],
+      window: { type: "rolling", duration_ms: DAY_MS, lateness_allowance_ms: 15 * 60 * 1000 },
+      aggregation: { operation: "count" },
+      privacy: { stores_content: false, cloud_allowed: true, retention_class: "security_365d" },
+    });
 
     this.baselines.register({
       baseline_id: DAILY_USAGE_BASELINE,
@@ -99,6 +145,18 @@ export class SentinelRuntime {
         ["tenant_id"],
       ],
       method: { type: "robust_seasonal", minimum_samples: 21, center: "median", dispersion: "median_absolute_deviation", ema_alpha: 0.15 },
+      protections: { exclude_active_incidents: true, max_single_window_influence: 0.05, freeze_on_confirmed_compromise: true },
+    });
+    this.baselines.register({
+      baseline_id: CACHE_HIT_RATIO_BASELINE,
+      version: "1.0.0",
+      feature: CACHE_HITS,
+      scope_priority: [
+        ["tenant_id", "account_id", "route_class"],
+        ["tenant_id", "route_class"],
+        ["tenant_id"],
+      ],
+      method: { type: "robust_seasonal", minimum_samples: 14, center: "median", dispersion: "median_absolute_deviation", ema_alpha: 0.15 },
       protections: { exclude_active_incidents: true, max_single_window_influence: 0.05, freeze_on_confirmed_compromise: true },
     });
 
@@ -135,6 +193,20 @@ export class SentinelRuntime {
     }
     for (const scope of scopes.values()) {
       const output = this.costNode.evaluate(scope, lastIso);
+      findings.push(...output.findings);
+      evidence.push(...output.evidence);
+    }
+
+    // Account-scoped cost detectors (billing divergence, quota bypass) run once
+    // per account so multi-route accounts are not double-flagged.
+    const accounts = new Map<string, { tenant_id: string; account_id: string }>();
+    for (const event of events) {
+      const tenantId = event.tenant?.tenant_id;
+      const accountId = event.tenant?.account_id;
+      if (tenantId && accountId) accounts.set(`${tenantId}|${accountId}`, { tenant_id: tenantId, account_id: accountId });
+    }
+    for (const account of accounts.values()) {
+      const output = this.costNode.evaluateAccount(account, lastIso);
       findings.push(...output.findings);
       evidence.push(...output.evidence);
     }

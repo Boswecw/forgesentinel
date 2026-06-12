@@ -11,7 +11,7 @@ repository; `partial` — meaningful subset implemented; `not started`.
 |---|---|---|---|
 | 0 | Architecture lock and contracts | done (MVP) | All contracts in `src/contracts/`; golden fixtures + manifest in `fixtures/golden/`; unknown-major rejection and additive-minor acceptance tested. TypeScript is the single contract source; Rust bindings pending (ADR-025). |
 | 1 | Evidence spine | done (MVP) | Gateway (auth, signatures, idempotency, explicit rejections), append-only ledger with WAL + corrections, local/cloud field policy, tenant-isolation denials, replay CLI. Centipede import format not yet implemented. |
-| 2 | Sentinel-Cost | partial | Extreme spike, sustained growth, retry storm in shadow with scoped robust baselines. Cache-collapse, billing-divergence, and quota-correlation findings pending. |
+| 2 | Sentinel-Cost | done (MVP) | Extreme spike, sustained growth, retry storm, **cache-collapse** (robust hit-ratio baseline), **billing/usage-divergence** (metered estimate vs finalized), and **quota-bypass** (feeds Prime correlation) — all shadow/recommend-only, covered by `test/cost.test.ts`. |
 | 3 | Sentinel-Cloud | partial | Key/region/device novelty + login-failure bursts in shadow; reversible key pause/resume + MFA require via capability-validated identity authority adapter. Implausible travel, session replay, service-identity findings pending. |
 | 4 | Forge_Command incident surface | not started | Incident/briefing contracts and CLI shadow report exist as the data layer; UI lives in the Forge_Command repository. |
 | 5 | Sentinel-Agent | not started | Agent event families registered in contracts only. |
@@ -38,7 +38,7 @@ repository; `partial` — meaningful subset implemented; `not started`.
 - SNT-010 Event Gateway — **done (MVP)**
 - SNT-020 Evidence Ledger — **done (MVP)** (DataForge service integration pending)
 - SNT-030 Feature/Baseline Service — **done (MVP)**
-- SNT-100 Sentinel-Cost — **partial**
+- SNT-100 Sentinel-Cost — **done (MVP)**
 - SNT-110 Sentinel-Cloud — **partial**
 - SNT-115 CSSA Evidence Adapter — **partial**
 - SNT-120/130/140/150 remaining nodes — **not started** (130 contracts exist)
